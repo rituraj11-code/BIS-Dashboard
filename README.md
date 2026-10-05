@@ -129,7 +129,7 @@ Ab sirf **ek hi Gmail account** upload/edit kar payega, baaki sab sirf **dekh** 
 ### 5a. `upload.html` mein apna admin email daalo
 File mein ye line dhundo (near the top of the `<script>` section):
 ```js
-const ADMIN_EMAIL = "YOUR_ADMIN_EMAIL@gmail.com";
+const ADMIN_EMAIL = "bis.userid@gmail.com";
 ```
 Isko apne asli Gmail address se replace karo — jis email se aap login karte ho, wahi daalna
 (jaise `rituraj11.something@gmail.com`). Yahi ek email upload panel use kar payega.
@@ -144,7 +144,7 @@ service cloud.firestore {
     match /reports/{document} {
       allow read: if true;
       allow write: if request.auth != null
-                   && request.auth.token.email == "YOUR_ADMIN_EMAIL@gmail.com";
+                   && request.auth.token.email == "bis.userid@gmail.com";
     }
   }
 }
