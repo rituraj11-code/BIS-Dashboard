@@ -52,15 +52,17 @@
     <img class="avatar" id="avatar" src="" alt="">
     <div class="uname" id="uname"></div>
     <div class="uemail" id="uemail"></div>
+    <a href="view-reports.html" style="display:block;margin-bottom:8px;padding:10px 20px;border-radius:9px;
+       background:var(--blue);color:#fff;font-weight:700;font-size:13px;text-decoration:none">Go to Dashboard →</a>
     <a href="upload.html" id="upload-link" style="display:block;margin-bottom:10px;padding:10px 20px;border-radius:9px;
-       background:var(--saffron);color:#5a3200;font-weight:700;font-size:13px;text-decoration:none">Upload Panel par jao →</a>
+       background:var(--saffron);color:#5a3200;font-weight:700;font-size:13px;text-decoration:none">Go to Upload Panel →</a>
     <button id="logout-btn">Logout</button>
   </div>
 
   <div class="setup-note" id="setup-note">
-    <b>Setup abhi baaki hai:</b> is page ko kaam karne ke liye neeche <code>firebaseConfig</code>
-    me apni Firebase project ki keys daalni hongi (README.md ka Step 2 dekho). Jab tak nahi dala,
-    button click karne par error aayega — ye normal hai.
+    <b>Setup pending:</b> this page needs your Firebase project keys in <code>firebaseConfig</code>
+    below to work (see Step 2 in README.md). Until then, clicking the button
+    will show an error — that is expected.
   </div>
 </div>
 
@@ -94,7 +96,7 @@
   const isPlaceholder = firebaseConfig.apiKey === "YOUR_API_KEY";
 
   if (isPlaceholder) {
-    statusEl.textContent = "Firebase config abhi set nahi hui — README ka Step 2 poora karo.";
+    statusEl.textContent = "Firebase config not set yet — please complete Step 2 in README.";
     statusEl.classList.add('error');
   } else {
     setupNote.style.display = "none";
@@ -102,7 +104,7 @@
 
   document.getElementById('signin-btn').addEventListener('click', async () => {
     if (isPlaceholder) {
-      statusEl.textContent = "Pehle firebaseConfig bharo (README Step 2) — tabhi login chalega.";
+      statusEl.textContent = "Please fill firebaseConfig first (README Step 2) — login will not work until then.";
       statusEl.classList.add('error');
       return;
     }
@@ -115,7 +117,7 @@
       const result = await signInWithPopup(auth, provider);
       // onAuthStateChanged will handle showing the user box
     } catch (err) {
-      statusEl.textContent = "Login fail hua: " + err.message;
+      statusEl.textContent = "Login failed: " + err.message;
       statusEl.classList.add('error');
     }
   });

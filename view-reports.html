@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BIS Dashboard — Live Reports</title>
+<style>
+  :root{--navy:#0b2559;--navy2:#123a7a;--saffron:#ff8f1f;--blue:#2f5bea;--bg:#f3f5fa;--text:#172033;--muted:#66738a;--line:#e4e8f0;--green:#1a8f4c;--red:#c9302c}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--text)}
+  .tricolor{position:fixed;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,#ff9933 0 33.3%,#ffffff 33.3% 66.6%,#128807 66.6% 100%);z-index:10}
+  header{background:linear-gradient(135deg,var(--navy),var(--navy2));color:#fff;padding:18px 24px;margin-top:4px}
+  header h1{margin:0;font-size:18px}
+  header p{margin:2px 0 0;font-size:12.5px;color:#cfe0ff}
+  .topbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+  .who{display:flex;align-items:center;gap:10px;font-size:13px}
+  .who img{width:30px;height:30px;border-radius:50%}
+  .navlinks a{color:#fff;text-decoration:none;font-size:12.5px;margin-right:14px;opacity:.9}
+  .navlinks a:hover{opacity:1;text-decoration:underline}
+  #logout-btn{padding:6px 14px;border-radius:7px;border:1px solid #ffffff44;background:#ffffff18;color:#fff;cursor:pointer;font-size:12.5px}
+  main{max-width:1200px;margin:0 auto;padding:22px}
+  .gate{max-width:420px;margin:60px auto;text-align:center;background:#fff;padding:30px;border-radius:14px;box-shadow:0 10px 30px #0001}
+  .gate a{color:var(--blue);font-weight:600;text-decoration:none}
+  .card{background:#fff;border-radius:14px;padding:20px 22px;box-shadow:0 2px 10px #0000000d;margin-bottom:18px}
+  .card h2,.card h3{margin:0 0 4px;color:var(--navy)}
+  .card h2{font-size:16px}
+  .card h3{font-size:14.5px}
+  .card p.sub{margin:0 0 16px;font-size:12.5px;color:var(--muted)}
+  .row{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;margin-bottom:4px}
+  label{font-size:12.5px;font-weight:600;color:var(--navy);display:block;margin-bottom:4px}
+  select{padding:9px 10px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;min-width:220px}
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:6px}
+  .kpi{background:#fafbfd;border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+  .kpi .label{font-size:11.5px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+  .kpi .value{font-size:21px;font-weight:800;color:var(--navy);margin-top:2px}
+  .kpi.acc-green .value{color:var(--green)}
+  .kpi.acc-saffron .value{color:#c9700f}
+  .barrow{display:flex;align-items:center;gap:10px;margin:7px 0;font-size:12.5px}
+  .barrow span{width:140px;flex-shrink:0;color:var(--text)}
+  .barrow .bar{flex:1;background:#eef1f7;border-radius:5px;height:10px;overflow:hidden}
+  .barrow .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--saffron),#ffb35c);border-radius:5px}
+  .barrow b{width:90px;text-align:right;color:var(--navy)}
+  input.search{width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;margin-bottom:10px}
+  table{border-collapse:collapse;width:100%;font-size:12.5px}
+  th,td{border:1px solid var(--line);padding:6px 8px;text-align:right}
+  th{background:#eef2fb;color:var(--navy);font-weight:700;position:sticky;top:0}
+  td:first-child,th:first-child{text-align:left}
+  tbody tr:nth-child(even){background:#fafbfd}
+  tfoot td{font-weight:800;background:#eef2fb}
+  .tablewrap{overflow:auto;max-height:520px;border:1px solid var(--line);border-radius:8px}
+  .meta{font-size:12px;color:var(--muted);margin-top:10px}
+  .empty{text-align:center;padding:40px 20px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="tricolor"></div>
+
+<div id="gate" class="gate" style="display:none">
+  <p>This page is for logged-in users only.</p>
+  <a href="index.html">Go to Login page →</a>
+</div>
+
+<div id="app" style="display:none">
+<header>
+  <div class="topbar">
+    <div>
+      <h1>BIS Dashboard — Live Reports</h1>
+      <p>Firestore se seedha data — koi hardcoded number nahi</p>
+    </div>
+    <div class="who">
+      <span class="navlinks"><a href="upload.html">+ Upload New Report</a></span>
+      <img id="avatar" src="" alt="">
+      <span id="uname"></span>
+      <button id="logout-btn">Logout</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="card">
+    <div class="row">
+      <div>
+        <label>Report Type</label>
+        <select id="report-type-filter">
+          <option value="cards_generated">Cards Generated (District-wise)</option>
+        </select>
+      </div>
+      <div>
+        <label>Report Date</label>
+        <select id="report-date-select"></select>
+      </div>
+    </div>
+    <div class="meta" id="meta-line"></div>
+  </div>
+
+  <div id="content-area">
+    <div class="card"><div class="empty" id="loading-msg">Loading reports...</div></div>
+  </div>
+</main>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import {
+    getFirestore, collection, query, where, orderBy, getDocs
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyD23gk8jk2oVcQC1t65cHeB4V7ZIJ2THhc",
+    authDomain: "bis-dashboard-709e4.firebaseapp.com",
+    projectId: "bis-dashboard-709e4",
+    storageBucket: "bis-dashboard-709e4.firebasestorage.app",
+    messagingSenderId: "371004041324",
+    appId: "1:371004041324:web:a9723c3c6c3d3ca54cd049",
+    measurementId: "G-07KE0XYCTP"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  const COLS = ["secc","tagged","vvs","chirayu","ext","cchfe","cchfp","asha","ah","aw","divyang"];
+  const COL_LABELS = {
+    secc:"SECC 2011", tagged:"Tagged", vvs:"VVS(70+)", chirayu:"CHIRAYU", ext:"CHIRAYU Ext.",
+    cchfe:"CCHF Emp.", cchfp:"CCHF Pens.", asha:"ASHA", ah:"Angan. Helper", aw:"Angan. Worker", divyang:"Divyang"
+  };
+
+  const gate = document.getElementById('gate');
+  const appEl = document.getElementById('app');
+  const dateSelect = document.getElementById('report-date-select');
+  const typeSelect = document.getElementById('report-type-filter');
+  const contentArea = document.getElementById('content-area');
+  const metaLine = document.getElementById('meta-line');
+
+  let allReports = []; // all docs for current type, sorted newest first
+
+  onAuthStateChanged(auth, (user) => {
+    if (!user) {
+      gate.style.display = 'block';
+      appEl.style.display = 'none';
+    } else {
+      gate.style.display = 'none';
+      appEl.style.display = 'block';
+      document.getElementById('avatar').src = user.photoURL || "";
+      document.getElementById('uname').textContent = user.displayName || user.email;
+      loadReports();
+    }
+  });
+
+  document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
+  typeSelect.addEventListener('change', loadReports);
+  dateSelect.addEventListener('change', () => {
+    const picked = allReports.find(r => r.id === dateSelect.value);
+    if (picked) renderReport(picked);
+  });
+
+  async function loadReports(){
+    contentArea.innerHTML = '<div class="card"><div class="empty">Loading reports...</div></div>';
+    dateSelect.innerHTML = '';
+    const reportType = typeSelect.value;
+    try {
+      const q = query(
+        collection(db, "reports"),
+        where("reportType", "==", reportType),
+        orderBy("reportDate", "desc")
+      );
+      const snap = await getDocs(q);
+      allReports = [];
+      snap.forEach(d => allReports.push({ id: d.id, ...d.data() }));
+
+      if (allReports.length === 0) {
+        contentArea.innerHTML = '<div class="card"><div class="empty">No report of this type has been saved yet. Use the <a href="upload.html">Upload Panel</a> to add the first one.</div></div>';
+        metaLine.textContent = '';
+        return;
+      }
+
+      allReports.forEach(r => {
+        const opt = document.createElement('option');
+        opt.value = r.id;
+        opt.textContent = r.reportDate;
+        dateSelect.appendChild(opt);
+      });
+
+      renderReport(allReports[0]);
+    } catch (err) {
+      contentArea.innerHTML = '<div class="card"><div class="empty" style="color:var(--red)">Error loading data: ' + err.message + '</div></div>';
+    }
+  }
+
+  function fmt(n){ return (n||0).toLocaleString('en-IN'); }
+
+  function renderReport(report){
+    const districts = report.districts || [];
+    const totals = {};
+    COLS.forEach(c => totals[c] = 0);
+    let grandTotal = 0;
+    districts.forEach(d => {
+      COLS.forEach(c => totals[c] += (d[c]||0));
+      grandTotal += (d.total||0);
+    });
+
+    const updatedAt = report.updatedAt && report.updatedAt.toDate ? report.updatedAt.toDate().toLocaleString('en-IN') : '—';
+    metaLine.textContent = `Last updated by ${report.updatedBy || 'unknown'} on ${updatedAt}`;
+
+    // KPI + scheme snapshot
+    const maxCol = Math.max(...COLS.map(c => totals[c]), 1);
+    let barsHtml = COLS.map(c => {
+      const pct = (totals[c] / maxCol * 100).toFixed(1);
+      return `<div class="barrow"><span>${COL_LABELS[c]}</span><div class="bar"><i style="width:${pct}%"></i></div><b>${fmt(totals[c])}</b></div>`;
+    }).join('');
+
+    // District table
+    const rowsHtml = districts.map(d => {
+      const cells = COLS.map(c => `<td>${fmt(d[c])}</td>`).join('');
+      return `<tr><td>${d.district}</td>${cells}<td><b>${fmt(d.total)}</b></td></tr>`;
+    }).join('');
+
+    const footCells = COLS.map(c => `<td>${fmt(totals[c])}</td>`).join('');
+
+    contentArea.innerHTML = `
+      <div class="card">
+        <h2>Overview — ${report.reportDate}</h2>
+        <div class="kpi-grid">
+          <div class="kpi acc-green"><div class="label">Total Cards Generated</div><div class="value">${fmt(grandTotal)}</div></div>
+          <div class="kpi"><div class="label">Districts Reporting</div><div class="value">${districts.length}</div></div>
+          <div class="kpi acc-saffron"><div class="label">Top Scheme</div><div class="value">${COL_LABELS[Object.keys(totals).reduce((a,b)=>totals[a]>totals[b]?a:b)]}</div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Scheme-wise Snapshot</h3>
+        ${barsHtml}
+      </div>
+
+      <div class="card">
+        <h3>District-wise Data</h3>
+        <input class="search" id="district-search" placeholder="Search district...">
+        <div class="tablewrap">
+          <table id="district-table">
+            <thead><tr><th>District</th>${COLS.map(c=>`<th>${COL_LABELS[c]}</th>`).join('')}<th>Total</th></tr></thead>
+            <tbody>${rowsHtml}</tbody>
+            <tfoot><tr><td>Total</td>${footCells}<td>${fmt(grandTotal)}</td></tr></tfoot>
+          </table>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('district-search').addEventListener('input', (e) => {
+      const q = e.target.value.toLowerCase();
+      document.querySelectorAll('#district-table tbody tr').forEach(tr => {
+        tr.style.display = tr.children[0].textContent.toLowerCase().includes(q) ? '' : 'none';
+      });
+    });
+  }
+</script>
+</body>
+</html>

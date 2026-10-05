@@ -46,8 +46,8 @@
 <div class="tricolor"></div>
 
 <div id="gate" class="gate" style="display:none">
-  <p>Ye panel sirf logged-in users ke liye hai.</p>
-  <a href="index.html">Login page par jao →</a>
+  <p>This panel is for logged-in users only.</p>
+  <a href="index.html">Go to Login page →</a>
 </div>
 
 <div id="app" style="display:none">
@@ -55,9 +55,10 @@
   <div class="topbar">
     <div>
       <h1>BIS Dashboard — Upload Panel</h1>
-      <p>District-wise Cards Generated report daalo</p>
+      <p>Enter a district-wise Cards Generated report</p>
     </div>
     <div class="who">
+      <a href="view-reports.html" style="color:#fff;font-size:12.5px;margin-right:6px;opacity:.9">View Dashboard</a>
       <img id="avatar" src="" alt="">
       <span id="uname"></span>
       <button id="logout-btn">Logout</button>
@@ -68,7 +69,7 @@
 <main>
   <div class="card">
     <h2>Report Details</h2>
-    <p class="sub">Report ka type aur date chuno, phir neeche district-wise numbers bharo.</p>
+    <p class="sub">Choose the report type and date, then fill in the district-wise numbers below.</p>
     <div class="row">
       <div>
         <label>Report Type</label>
@@ -81,12 +82,12 @@
         <input type="date" id="report-date">
       </div>
     </div>
-    <div class="hint">Abhi sirf "Cards Generated" form hai — Eligible, Pending, Period wale forms agli baar isi tarah jodenge.</div>
+    <div class="hint">Only the "Cards Generated" form is available right now — Eligible, Pending and Period forms will be added the same way later.</div>
   </div>
 
   <div class="card">
     <h2>District-wise Data</h2>
-    <p class="sub">Total column khud calculate ho jayega. Blank chhod sakte ho jahan value nahi hai (0 maan liya jayega).</p>
+    <p class="sub">The Total column is calculated automatically. You can leave a field blank where there is no value (it will be treated as 0).</p>
     <div class="tablewrap">
       <table>
         <thead>
@@ -209,7 +210,7 @@
     const reportType = document.getElementById('report-type').value;
     const reportDate = document.getElementById('report-date').value;
     if (!reportDate){
-      statusEl.textContent = "Pehle report date chuno.";
+      statusEl.textContent = "Please choose a report date first.";
       statusEl.className = "err";
       return;
     }
