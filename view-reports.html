@@ -15,7 +15,13 @@
   .topbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
   .navlinks a{color:#fff;text-decoration:none;font-size:12.5px;margin-left:14px;opacity:.9}
   .navlinks a:hover{opacity:1;text-decoration:underline}
+  .tabs{display:flex;gap:8px;padding:12px 24px 0;background:#fff;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .tabs button{padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);
+       cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-1px}
+  .tabs button.active{color:var(--navy);border-bottom-color:var(--saffron)}
   main{max-width:1200px;margin:0 auto;padding:22px}
+  .section{display:none}
+  .section.active{display:block}
   .card{background:#fff;border-radius:14px;padding:20px 22px;box-shadow:0 2px 10px #0000000d;margin-bottom:18px}
   .card h2,.card h3{margin:0 0 4px;color:var(--navy)}
   .card h2{font-size:16px}
@@ -29,6 +35,7 @@
   .kpi .label{font-size:11.5px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.3px}
   .kpi .value{font-size:21px;font-weight:800;color:var(--navy);margin-top:2px}
   .kpi.acc-green .value{color:var(--green)}
+  .kpi.acc-red .value{color:var(--red)}
   .kpi.acc-saffron .value{color:#c9700f}
   .barrow{display:flex;align-items:center;gap:10px;margin:7px 0;font-size:12.5px}
   .barrow span{width:140px;flex-shrink:0;color:var(--text)}
@@ -45,6 +52,7 @@
   .tablewrap{overflow:auto;max-height:520px;border:1px solid var(--line);border-radius:8px}
   .meta{font-size:12px;color:var(--muted);margin-top:10px}
   .empty{text-align:center;padding:40px 20px;color:var(--muted)}
+  .pill{display:inline-block;font-size:11px;padding:3px 9px;border-radius:20px;background:#eef2fb;color:var(--navy);font-weight:600;margin-left:8px}
 </style>
 </head>
 <body>
@@ -62,7 +70,30 @@
   </div>
 </header>
 
+<div class="tabs">
+  <button class="active" onclick="showTab('overview',this)">Overview</button>
+  <button onclick="showTab('districts',this)">District Reports</button>
+  <button onclick="showTab('period',this)">Period Growth</button>
+</div>
+
 <main>
+
+<!-- ===================== OVERVIEW TAB ===================== -->
+<section id="overview" class="section active">
+  <div class="card">
+    <div class="row">
+      <div>
+        <label>As-of Date</label>
+        <select id="overview-date-select"></select>
+      </div>
+    </div>
+    <div class="meta" id="overview-meta"></div>
+  </div>
+  <div id="overview-content"><div class="card"><div class="empty">Loading...</div></div></div>
+</section>
+
+<!-- ===================== DISTRICT REPORTS TAB ===================== -->
+<section id="districts" class="section">
   <div class="card">
     <div class="row">
       <div>
@@ -76,10 +107,23 @@
     </div>
     <div class="meta" id="meta-line"></div>
   </div>
+  <div id="content-area"><div class="card"><div class="empty">Loading...</div></div></div>
+</section>
 
-  <div id="content-area">
-    <div class="card"><div class="empty" id="loading-msg">Loading reports...</div></div>
+<!-- ===================== PERIOD GROWTH TAB ===================== -->
+<section id="period" class="section">
+  <div class="card">
+    <div class="row">
+      <div>
+        <label>Period</label>
+        <select id="period-date-select"></select>
+      </div>
+    </div>
+    <div class="meta" id="period-meta"></div>
   </div>
+  <div id="period-content"><div class="card"><div class="empty">Loading...</div></div></div>
+</section>
+
 </main>
 
 <script type="module">
@@ -101,8 +145,7 @@
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
 
-  // Same report-type configs as upload.html — keep these two files in sync
-  // when a new report type is added.
+  // Keep in sync with upload.html
   const REPORT_TYPES = {
     cards_generated: {
       label: "Cards Generated (District-wise)",
@@ -129,72 +172,176 @@
     }
   };
 
+  function fmt(n){ return (n||0).toLocaleString('en-IN'); }
+
+  // ---------- Tab switching ----------
+  window.showTab = function(id, btn){
+    document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    document.querySelectorAll('.tabs button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+  };
+
+  // ---------- Fetch helper: all docs of a given reportType, sorted newest first ----------
+  async function fetchType(reportType){
+    const q = query(collection(db, "reports"), where("reportType", "==", reportType));
+    const snap = await getDocs(q);
+    const docs = [];
+    snap.forEach(d => docs.push({ id: d.id, ...d.data() }));
+    docs.sort((a,b) => (b.reportDate||'').localeCompare(a.reportDate||''));
+    return docs;
+  }
+
+  function totalsOf(report, cols){
+    const totals = {}; cols.forEach(c=>totals[c]=0);
+    let grand = 0;
+    (report.districts||[]).forEach(d=>{
+      cols.forEach(c=> totals[c] += (d[c]||0));
+      grand += (d.total||0);
+    });
+    return { totals, grand };
+  }
+
+  // =====================================================================
+  // OVERVIEW TAB — combines eligible + cards_generated + pending
+  // =====================================================================
+  let ELIGIBLE_DOCS = [], GENERATED_DOCS = [], PENDING_DOCS = [];
+  const COLS_CORE = REPORT_TYPES.cards_generated.cols;
+  const LABELS_CORE = REPORT_TYPES.cards_generated.colLabels;
+
+  async function loadOverview(){
+    const dateSelect = document.getElementById('overview-date-select');
+    const contentEl = document.getElementById('overview-content');
+    contentEl.innerHTML = '<div class="card"><div class="empty">Loading...</div></div>';
+
+    [ELIGIBLE_DOCS, GENERATED_DOCS, PENDING_DOCS] = await Promise.all([
+      fetchType('eligible'), fetchType('cards_generated'), fetchType('pending')
+    ]);
+
+    // union of all dates seen in eligible or generated (the two that matter most for coverage)
+    const dateSet = new Set([...ELIGIBLE_DOCS, ...GENERATED_DOCS].map(d=>d.reportDate));
+    const dates = [...dateSet].sort().reverse();
+
+    if (dates.length === 0){
+      contentEl.innerHTML = '<div class="card"><div class="empty">No Eligible or Cards Generated reports saved yet. Use the Upload Panel to add data.</div></div>';
+      dateSelect.innerHTML = '';
+      return;
+    }
+
+    dateSelect.innerHTML = dates.map(d=>`<option value="${d}">${d}</option>`).join('');
+    renderOverview(dates[0]);
+  }
+
+  function renderOverview(dateStr){
+    const contentEl = document.getElementById('overview-content');
+    const metaEl = document.getElementById('overview-meta');
+
+    const elig = ELIGIBLE_DOCS.find(d=>d.reportDate===dateStr);
+    const gen  = GENERATED_DOCS.find(d=>d.reportDate===dateStr);
+    const pend = PENDING_DOCS.find(d=>d.reportDate===dateStr);
+
+    const eligT = elig ? totalsOf(elig, COLS_CORE) : null;
+    const genT  = gen  ? totalsOf(gen,  COLS_CORE) : null;
+    const pendT = pend ? totalsOf(pend, COLS_CORE) : null;
+
+    const totalEligible = eligT ? eligT.grand : null;
+    const totalGenerated = genT ? genT.grand : null;
+    const totalPending = pendT ? pendT.grand : (totalEligible!=null && totalGenerated!=null ? totalEligible-totalGenerated : null);
+    const coverage = (totalEligible && totalGenerated!=null) ? (totalGenerated/totalEligible*100).toFixed(2) : null;
+
+    const missing = [];
+    if (!elig) missing.push('Eligible');
+    if (!gen) missing.push('Cards Generated');
+    if (!pend) missing.push('Pending (will be computed as Eligible − Generated if both present)');
+
+    metaEl.innerHTML = missing.length
+      ? `<span class="pill">Note: ${missing.join(' · ')} not saved for this date</span>`
+      : `All three reports available for ${dateStr}`;
+
+    let schemeRows = '';
+    if (eligT || genT || pendT){
+      schemeRows = COLS_CORE.map(c=>{
+        const e = eligT ? eligT.totals[c] : null;
+        const g = genT ? genT.totals[c] : null;
+        const p = pendT ? pendT.totals[c] : (e!=null && g!=null ? e-g : null);
+        const cov = (e && g!=null) ? (g/e*100).toFixed(2)+'%' : '—';
+        return `<tr><td>${LABELS_CORE[c]}</td><td>${e!=null?fmt(e):'—'}</td><td>${g!=null?fmt(g):'—'}</td><td>${p!=null?fmt(p):'—'}</td><td>${cov}</td></tr>`;
+      }).join('');
+    }
+
+    contentEl.innerHTML = `
+      <div class="card">
+        <h2>Executive Snapshot — ${dateStr}</h2>
+        <div class="kpi-grid">
+          <div class="kpi acc-green"><div class="label">Total Cards Generated</div><div class="value">${totalGenerated!=null?fmt(totalGenerated):'—'}</div></div>
+          <div class="kpi"><div class="label">Total Eligible</div><div class="value">${totalEligible!=null?fmt(totalEligible):'—'}</div></div>
+          <div class="kpi acc-red"><div class="label">Total Pending</div><div class="value">${totalPending!=null?fmt(totalPending):'—'}</div></div>
+          <div class="kpi acc-saffron"><div class="label">Coverage</div><div class="value">${coverage!=null?coverage+'%':'—'}</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Scheme-wise Coverage</h3>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>Scheme</th><th>Eligible</th><th>Generated</th><th>Pending</th><th>Coverage</th></tr></thead>
+            <tbody>${schemeRows || '<tr><td colspan="5" class="empty">No data for this date</td></tr>'}</tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  document.getElementById('overview-date-select').addEventListener('change', (e)=> renderOverview(e.target.value));
+
+  // =====================================================================
+  // DISTRICT REPORTS TAB — raw per-type view (any of the 4 types)
+  // =====================================================================
   const typeSelect = document.getElementById('report-type-filter');
   Object.entries(REPORT_TYPES).forEach(([key, cfg]) => {
     const opt = document.createElement('option');
-    opt.value = key;
-    opt.textContent = cfg.label;
+    opt.value = key; opt.textContent = cfg.label;
     typeSelect.appendChild(opt);
   });
 
   const dateSelect = document.getElementById('report-date-select');
   const contentArea = document.getElementById('content-area');
   const metaLine = document.getElementById('meta-line');
-
   let allReports = [];
 
-  typeSelect.addEventListener('change', loadReports);
+  typeSelect.addEventListener('change', loadDistrictTab);
   dateSelect.addEventListener('change', () => {
     const picked = allReports.find(r => r.id === dateSelect.value);
-    if (picked) renderReport(picked);
+    if (picked) renderDistrictReport(picked);
   });
 
-  async function loadReports(){
-    contentArea.innerHTML = '<div class="card"><div class="empty">Loading reports...</div></div>';
+  async function loadDistrictTab(){
+    contentArea.innerHTML = '<div class="card"><div class="empty">Loading...</div></div>';
     dateSelect.innerHTML = '';
     const reportType = typeSelect.value;
     try {
-      const q = query(
-        collection(db, "reports"),
-        where("reportType", "==", reportType)
-      );
-      const snap = await getDocs(q);
-      allReports = [];
-      snap.forEach(d => allReports.push({ id: d.id, ...d.data() }));
-      allReports.sort((a, b) => (b.reportDate || '').localeCompare(a.reportDate || ''));
-
+      allReports = await fetchType(reportType);
       if (allReports.length === 0) {
         contentArea.innerHTML = '<div class="card"><div class="empty">No report of this type has been saved yet.</div></div>';
         metaLine.textContent = '';
         return;
       }
-
       allReports.forEach(r => {
         const opt = document.createElement('option');
         opt.value = r.id;
         opt.textContent = r.periodStart ? `${r.periodStart} to ${r.reportDate}` : r.reportDate;
         dateSelect.appendChild(opt);
       });
-
-      renderReport(allReports[0]);
+      renderDistrictReport(allReports[0]);
     } catch (err) {
       contentArea.innerHTML = '<div class="card"><div class="empty" style="color:var(--red)">Error loading data: ' + err.message + '</div></div>';
     }
   }
 
-  function fmt(n){ return (n||0).toLocaleString('en-IN'); }
-
-  function renderReport(report){
+  function renderDistrictReport(report){
     const cfg = REPORT_TYPES[report.reportType] || REPORT_TYPES.cards_generated;
     const COLS = cfg.cols;
     const districts = report.districts || [];
-    const totals = {};
-    COLS.forEach(c => totals[c] = 0);
-    let grandTotal = 0;
-    districts.forEach(d => {
-      COLS.forEach(c => totals[c] += (d[c]||0));
-      grandTotal += (d.total||0);
-    });
+    const { totals, grand: grandTotal } = totalsOf(report, COLS);
 
     const updatedAt = report.updatedAt && report.updatedAt.toDate ? report.updatedAt.toDate().toLocaleString('en-IN') : '—';
     const dateLabel = report.periodStart ? `${report.periodStart} to ${report.reportDate}` : report.reportDate;
@@ -222,12 +369,10 @@
           <div class="kpi acc-saffron"><div class="label">Top Scheme</div><div class="value">${cfg.colLabels[Object.keys(totals).reduce((a,b)=>totals[a]>totals[b]?a:b)]}</div></div>
         </div>
       </div>
-
       <div class="card">
         <h3>Scheme-wise Snapshot</h3>
         ${barsHtml}
       </div>
-
       <div class="card">
         <h3>District-wise Data</h3>
         <input class="search" id="district-search" placeholder="Search district...">
@@ -249,7 +394,78 @@
     });
   }
 
-  loadReports();
+  // =====================================================================
+  // PERIOD GROWTH TAB
+  // =====================================================================
+  let PERIOD_DOCS = [];
+  const periodDateSelect = document.getElementById('period-date-select');
+  const periodContent = document.getElementById('period-content');
+  const periodMeta = document.getElementById('period-meta');
+
+  async function loadPeriodTab(){
+    periodContent.innerHTML = '<div class="card"><div class="empty">Loading...</div></div>';
+    PERIOD_DOCS = await fetchType('period');
+    if (PERIOD_DOCS.length === 0){
+      periodContent.innerHTML = '<div class="card"><div class="empty">No Period Growth report saved yet.</div></div>';
+      periodDateSelect.innerHTML = '';
+      return;
+    }
+    periodDateSelect.innerHTML = PERIOD_DOCS.map(r=>{
+      const lbl = r.periodStart ? `${r.periodStart} to ${r.reportDate}` : r.reportDate;
+      return `<option value="${r.id}">${lbl}</option>`;
+    }).join('');
+    renderPeriod(PERIOD_DOCS[0]);
+  }
+
+  periodDateSelect.addEventListener('change', ()=>{
+    const picked = PERIOD_DOCS.find(r=>r.id===periodDateSelect.value);
+    if (picked) renderPeriod(picked);
+  });
+
+  function renderPeriod(report){
+    const cfg = REPORT_TYPES.period;
+    const COLS = cfg.cols;
+    const districts = report.districts || [];
+    const { totals, grand: grandTotal } = totalsOf(report, COLS);
+    const updatedAt = report.updatedAt && report.updatedAt.toDate ? report.updatedAt.toDate().toLocaleString('en-IN') : '—';
+    const dateLabel = report.periodStart ? `${report.periodStart} to ${report.reportDate}` : report.reportDate;
+    periodMeta.textContent = `Last updated by ${report.updatedBy || 'unknown'} on ${updatedAt}`;
+
+    const topDistrict = districts.reduce((best,d)=> (!best || d.total>best.total) ? d : best, null);
+    const topScheme = Object.keys(totals).reduce((a,b)=>totals[a]>totals[b]?a:b);
+
+    const rowsHtml = districts.map(d => {
+      const cells = COLS.map(c => `<td>${fmt(d[c])}</td>`).join('');
+      return `<tr><td>${d.district}</td>${cells}<td><b>${fmt(d.total)}</b></td></tr>`;
+    }).join('');
+    const footCells = COLS.map(c => `<td>${fmt(totals[c])}</td>`).join('');
+
+    periodContent.innerHTML = `
+      <div class="card">
+        <h2>Period Card Generation — ${dateLabel}</h2>
+        <div class="kpi-grid">
+          <div class="kpi acc-green"><div class="label">Total (All Categories)</div><div class="value">${fmt(grandTotal)}</div></div>
+          <div class="kpi acc-saffron"><div class="label">Top District</div><div class="value">${topDistrict?topDistrict.district:'—'}</div><div class="label" style="margin-top:4px">${topDistrict?fmt(topDistrict.total)+' cards':''}</div></div>
+          <div class="kpi"><div class="label">Largest Contributor Scheme</div><div class="value">${cfg.colLabels[topScheme]}</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>District-wise Data</h3>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>District</th>${COLS.map(c=>`<th>${cfg.colLabels[c]}</th>`).join('')}<th>Total</th></tr></thead>
+            <tbody>${rowsHtml}</tbody>
+            <tfoot><tr><td>Total</td>${footCells}<td>${fmt(grandTotal)}</td></tr></tfoot>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  // ---------- Kick off ----------
+  loadOverview();
+  loadDistrictTab();
+  loadPeriodTab();
 </script>
 </body>
 </html>
