@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BIS Dashboard — Upload Panel</title>
+<style>
+  :root{--navy:#0b2559;--navy2:#123a7a;--saffron:#ff8f1f;--blue:#2f5bea;--bg:#f3f5fa;--text:#172033;--muted:#66738a;--line:#e4e8f0;--green:#1a8f4c}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--text)}
+  .tricolor{position:fixed;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,#ff9933 0 33.3%,#ffffff 33.3% 66.6%,#128807 66.6% 100%);z-index:10}
+  header{background:linear-gradient(135deg,var(--navy),var(--navy2));color:#fff;padding:18px 24px;margin-top:4px}
+  header h1{margin:0;font-size:18px}
+  header p{margin:2px 0 0;font-size:12.5px;color:#cfe0ff}
+  .topbar{display:flex;justify-content:space-between;align-items:center}
+  .who{display:flex;align-items:center;gap:10px;font-size:13px}
+  .who img{width:30px;height:30px;border-radius:50%}
+  #logout-btn{padding:6px 14px;border-radius:7px;border:1px solid #ffffff44;background:#ffffff18;color:#fff;cursor:pointer;font-size:12.5px}
+  main{max-width:1200px;margin:0 auto;padding:22px}
+  .gate{max-width:420px;margin:60px auto;text-align:center;background:#fff;padding:30px;border-radius:14px;box-shadow:0 10px 30px #0001}
+  .gate a{color:var(--blue);font-weight:600;text-decoration:none}
+  .card{background:#fff;border-radius:14px;padding:20px 22px;box-shadow:0 2px 10px #0000000d;margin-bottom:18px}
+  .card h2{margin:0 0 4px;font-size:16px;color:var(--navy)}
+  .card p.sub{margin:0 0 16px;font-size:12.5px;color:var(--muted)}
+  .row{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:16px}
+  label{font-size:12.5px;font-weight:600;color:var(--navy);display:block;margin-bottom:4px}
+  input[type=date],select{padding:9px 10px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;min-width:200px}
+  table{border-collapse:collapse;width:100%;font-size:12.5px}
+  th,td{border:1px solid var(--line);padding:5px 6px;text-align:center}
+  th{background:#eef2fb;color:var(--navy);font-weight:700;position:sticky;top:0}
+  td.dist{text-align:left;font-weight:600;white-space:nowrap;background:#fafbfd}
+  td input{width:78px;padding:5px;border:1px solid var(--line);border-radius:5px;font-size:12.5px;text-align:right}
+  td.total{font-weight:700;background:#fff8ea}
+  .tablewrap{overflow:auto;max-height:520px;border:1px solid var(--line);border-radius:8px}
+  .actions{display:flex;gap:10px;align-items:center;margin-top:16px}
+  #save-btn{padding:11px 26px;border:none;border-radius:9px;background:var(--saffron);color:#5a3200;font-weight:700;cursor:pointer;font-size:13.5px}
+  #save-btn:disabled{opacity:.5;cursor:not-allowed}
+  #save-status{font-size:12.5px;color:var(--muted)}
+  #save-status.ok{color:var(--green);font-weight:600}
+  #save-status.err{color:#c9302c;font-weight:600}
+  .foot-total{font-weight:800;background:#eef2fb}
+  .hint{background:#fff3d6;color:#8a5a00;padding:10px 12px;border-radius:8px;font-size:12px;margin-bottom:14px}
+</style>
+</head>
+<body>
+<div class="tricolor"></div>
+
+<div id="gate" class="gate" style="display:none">
+  <p>Ye panel sirf logged-in users ke liye hai.</p>
+  <a href="index.html">Login page par jao →</a>
+</div>
+
+<div id="app" style="display:none">
+<header>
+  <div class="topbar">
+    <div>
+      <h1>BIS Dashboard — Upload Panel</h1>
+      <p>District-wise Cards Generated report daalo</p>
+    </div>
+    <div class="who">
+      <img id="avatar" src="" alt="">
+      <span id="uname"></span>
+      <button id="logout-btn">Logout</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="card">
+    <h2>Report Details</h2>
+    <p class="sub">Report ka type aur date chuno, phir neeche district-wise numbers bharo.</p>
+    <div class="row">
+      <div>
+        <label>Report Type</label>
+        <select id="report-type">
+          <option value="cards_generated">Cards Generated (District-wise)</option>
+        </select>
+      </div>
+      <div>
+        <label>Report Date (AWS snapshot)</label>
+        <input type="date" id="report-date">
+      </div>
+    </div>
+    <div class="hint">Abhi sirf "Cards Generated" form hai — Eligible, Pending, Period wale forms agli baar isi tarah jodenge.</div>
+  </div>
+
+  <div class="card">
+    <h2>District-wise Data</h2>
+    <p class="sub">Total column khud calculate ho jayega. Blank chhod sakte ho jahan value nahi hai (0 maan liya jayega).</p>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr>
+            <th>District</th><th>SECC 2011</th><th>Tagged</th><th>VVS(70+)</th>
+            <th>CHIRAYU</th><th>CHIRAYU Ext.</th><th>CCHF Emp.</th><th>CCHF Pens.</th>
+            <th>ASHA</th><th>Angan. Helper</th><th>Angan. Worker</th><th>Divyang</th><th>Total</th>
+          </tr>
+        </thead>
+        <tbody id="district-body"></tbody>
+        <tfoot>
+          <tr class="foot-total" id="footer-row"></tr>
+        </tfoot>
+      </table>
+    </div>
+    <div class="actions">
+      <button id="save-btn">Save Report</button>
+      <span id="save-status"></span>
+    </div>
+  </div>
+</main>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import {
+    getFirestore, doc, setDoc, serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyD23gk8jk2oVcQC1t65cHeB4V7ZIJ2THhc",
+    authDomain: "bis-dashboard-709e4.firebaseapp.com",
+    projectId: "bis-dashboard-709e4",
+    storageBucket: "bis-dashboard-709e4.firebasestorage.app",
+    messagingSenderId: "371004041324",
+    appId: "1:371004041324:web:a9723c3c6c3d3ca54cd049",
+    measurementId: "G-07KE0XYCTP"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  const DISTRICTS = [
+    ["Ambala","58"],["Bhiwani","59"],["Faridabad","60"],["Fatehabad","61"],["Gurugram","62"],
+    ["Hisar","63"],["Jhajjar","64"],["Jind","65"],["Kaithal","66"],["Karnal","67"],
+    ["Kurukshetra","68"],["Mahendergarh","69"],["Panchkula","70"],["Panipat","71"],["Rewari","72"],
+    ["Rohtak","73"],["Sirsa","74"],["Sonipat","75"],["Yamunanagar","76"],["Mewat","604"],
+    ["Palwal","619"],["Charkhi Dadri","701"],["Hansi","792"]
+  ];
+  const COLS = ["secc","tagged","vvs","chirayu","ext","cchfe","cchfp","asha","ah","aw","divyang"];
+
+  const tbody = document.getElementById('district-body');
+  DISTRICTS.forEach(([name,lgd])=>{
+    const tr = document.createElement('tr');
+    tr.dataset.lgd = lgd;
+    tr.dataset.district = name;
+    let cells = `<td class="dist">${name}<br><span style="font-weight:400;color:#99a3b5">LGD ${lgd}</span></td>`;
+    COLS.forEach(c=>{
+      cells += `<td><input type="number" min="0" class="f-${c}" oninput="window.recalcRow(this)"></td>`;
+    });
+    cells += `<td class="total" id="tot-${lgd}">0</td>`;
+    tr.innerHTML = cells;
+    tbody.appendChild(tr);
+  });
+
+  function recalcRow(el){
+    const tr = el.closest('tr');
+    const lgd = tr.dataset.lgd;
+    let sum = 0;
+    COLS.forEach(c=>{
+      const v = parseInt(tr.querySelector('.f-'+c).value || '0', 10) || 0;
+      sum += v;
+    });
+    document.getElementById('tot-'+lgd).textContent = sum.toLocaleString('en-IN');
+    recalcFooter();
+  }
+  window.recalcRow = recalcRow;
+
+  function recalcFooter(){
+    const footer = document.getElementById('footer-row');
+    let cells = `<td class="dist">Total</td>`;
+    let grand = 0;
+    COLS.forEach(c=>{
+      let colSum = 0;
+      document.querySelectorAll('.f-'+c).forEach(inp=>{ colSum += parseInt(inp.value||'0',10)||0; });
+      grand += colSum;
+      cells += `<td>${colSum.toLocaleString('en-IN')}</td>`;
+    });
+    cells += `<td>${grand.toLocaleString('en-IN')}</td>`;
+    footer.innerHTML = cells;
+  }
+  recalcFooter();
+
+  // Default date = today
+  document.getElementById('report-date').valueAsDate = new Date();
+
+  // --- Auth guard ---
+  const gate = document.getElementById('gate');
+  const appEl = document.getElementById('app');
+
+  onAuthStateChanged(auth, (user)=>{
+    if (!user){
+      gate.style.display = 'block';
+      appEl.style.display = 'none';
+    } else {
+      gate.style.display = 'none';
+      appEl.style.display = 'block';
+      document.getElementById('avatar').src = user.photoURL || "";
+      document.getElementById('uname').textContent = user.displayName || user.email;
+    }
+  });
+
+  document.getElementById('logout-btn').addEventListener('click', ()=> signOut(auth));
+
+  // --- Save to Firestore ---
+  document.getElementById('save-btn').addEventListener('click', async ()=>{
+    const statusEl = document.getElementById('save-status');
+    const reportType = document.getElementById('report-type').value;
+    const reportDate = document.getElementById('report-date').value;
+    if (!reportDate){
+      statusEl.textContent = "Pehle report date chuno.";
+      statusEl.className = "err";
+      return;
+    }
+    const districts = [];
+    document.querySelectorAll('#district-body tr').forEach(tr=>{
+      const row = { district: tr.dataset.district, lgd: tr.dataset.lgd };
+      let total = 0;
+      COLS.forEach(c=>{
+        const v = parseInt(tr.querySelector('.f-'+c).value || '0', 10) || 0;
+        row[c] = v;
+        total += v;
+      });
+      row.total = total;
+      districts.push(row);
+    });
+
+    const user = auth.currentUser;
+    const docId = reportType + "_" + reportDate;
+    const saveBtn = document.getElementById('save-btn');
+    saveBtn.disabled = true;
+    statusEl.textContent = "Saving...";
+    statusEl.className = "";
+
+    try {
+      await setDoc(doc(db, "reports", docId), {
+        reportType,
+        reportDate,
+        districts,
+        updatedBy: user ? (user.email || user.displayName) : "unknown",
+        updatedAt: serverTimestamp()
+      });
+      statusEl.textContent = "Saved! (" + reportDate + ")";
+      statusEl.className = "ok";
+    } catch (err) {
+      statusEl.textContent = "Error: " + err.message;
+      statusEl.className = "err";
+    } finally {
+      saveBtn.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>
