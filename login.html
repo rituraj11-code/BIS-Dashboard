@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BIS Review Dashboard — Login</title>
+<style>
+  :root{--navy:#0b2559;--navy2:#123a7a;--saffron:#ff8f1f;--blue:#2f5bea;--bg:#f3f5fa;--text:#172033;--muted:#66738a;--line:#e4e8f0}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
+       font-family:'Segoe UI',Arial,sans-serif;background:linear-gradient(135deg,var(--navy) 0%,var(--navy2) 55%,#1a4f9c 100%)}
+  .tricolor{position:fixed;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,#ff9933 0 33.3%,#ffffff 33.3% 66.6%,#128807 66.6% 100%)}
+  .card{background:#fff;border-radius:16px;padding:38px 34px;width:100%;max-width:380px;box-shadow:0 20px 50px #0003;text-align:center}
+  .brand-badge{width:52px;height:52px;border-radius:12px;background:linear-gradient(135deg,var(--saffron),#ffb35c);
+       display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#7a3d00;margin:0 auto 16px}
+  h1{font-size:19px;color:var(--navy);margin:0 0 4px}
+  p.sub{color:var(--muted);font-size:13px;margin:0 0 26px}
+  #signin-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;
+       padding:12px 16px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--text);
+       font-size:14.5px;font-weight:600;cursor:pointer;transition:.15s}
+  #signin-btn:hover{background:#f7f9fd;box-shadow:0 2px 10px #0001}
+  #signin-btn img{width:20px;height:20px}
+  #status{margin-top:18px;font-size:12.5px;color:var(--muted);min-height:18px}
+  #status.error{color:#c9302c}
+  .userbox{display:none}
+  .userbox.active{display:block}
+  .avatar{width:64px;height:64px;border-radius:50%;margin:0 auto 12px;display:block;border:3px solid #eef3ff}
+  .uname{font-weight:700;color:var(--navy);font-size:15px}
+  .uemail{color:var(--muted);font-size:12.5px;margin-bottom:20px}
+  #logout-btn{padding:10px 20px;border-radius:9px;border:1px solid var(--line);background:#fdeceb;color:#a12822;
+       font-weight:600;cursor:pointer;font-size:13px}
+  .setup-note{margin-top:22px;padding:12px;background:#fff3d6;border-radius:9px;color:#8a5a00;font-size:11.5px;text-align:left;line-height:1.5}
+  #pre-auth{display:block}
+</style>
+</head>
+<body>
+<div class="tricolor"></div>
+<div class="card">
+  <div class="brand-badge">AB</div>
+  <h1>BIS Review Dashboard</h1>
+  <p class="sub">Ayushman Bharat – Haryana (AB-HHPA) | BIS Branch</p>
+
+  <div id="pre-auth">
+    <button id="signin-btn">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="">
+      Sign in with Google
+    </button>
+    <div id="status"></div>
+  </div>
+
+  <div class="userbox" id="userbox">
+    <img class="avatar" id="avatar" src="" alt="">
+    <div class="uname" id="uname"></div>
+    <div class="uemail" id="uemail"></div>
+    <button id="logout-btn">Logout</button>
+  </div>
+
+  <div class="setup-note" id="setup-note">
+    <b>Setup abhi baaki hai:</b> is page ko kaam karne ke liye neeche <code>firebaseConfig</code>
+    me apni Firebase project ki keys daalni hongi (README.md ka Step 2 dekho). Jab tak nahi dala,
+    button click karne par error aayega — ye normal hai.
+  </div>
+</div>
+
+<!-- Firebase SDK (CDN) -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import {
+    getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+  // ======================================================
+  // STEP 2 complete karne ke baad, ye placeholder apni
+  // Firebase project ki asli config se replace karo.
+  // (Firebase Console → Project Settings → Your apps → Web app)
+  // ======================================================
+  const firebaseConfig = {
+    apiKey: "AIzaSyD23gk8jk2oVcQC1t65cHeB4V7ZIJ2THhc",
+    authDomain: "bis-dashboard-709e4.firebaseapp.com",
+    projectId: "bis-dashboard-709e4",
+    storageBucket: "bis-dashboard-709e4.firebasestorage.app",
+    messagingSenderId: "371004041324",
+    appId: "1:371004041324:web:a9723c3c6c3d3ca54cd049",
+    measurementId: "G-07KE0XYCTP"
+  };
+
+  const statusEl = document.getElementById('status');
+  const setupNote = document.getElementById('setup-note');
+  const preAuth = document.getElementById('pre-auth');
+  const userbox = document.getElementById('userbox');
+
+  const isPlaceholder = firebaseConfig.apiKey === "YOUR_API_KEY";
+
+  if (isPlaceholder) {
+    statusEl.textContent = "Firebase config abhi set nahi hui — README ka Step 2 poora karo.";
+    statusEl.classList.add('error');
+  } else {
+    setupNote.style.display = "none";
+  }
+
+  document.getElementById('signin-btn').addEventListener('click', async () => {
+    if (isPlaceholder) {
+      statusEl.textContent = "Pehle firebaseConfig bharo (README Step 2) — tabhi login chalega.";
+      statusEl.classList.add('error');
+      return;
+    }
+    try {
+      const app = initializeApp(firebaseConfig);
+      const auth = getAuth(app);
+      const provider = new GoogleAuthProvider();
+      statusEl.textContent = "Signing in...";
+      statusEl.classList.remove('error');
+      const result = await signInWithPopup(auth, provider);
+      // onAuthStateChanged will handle showing the user box
+    } catch (err) {
+      statusEl.textContent = "Login fail hua: " + err.message;
+      statusEl.classList.add('error');
+    }
+  });
+
+  if (!isPlaceholder) {
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        preAuth.style.display = "none";
+        userbox.classList.add('active');
+        document.getElementById('avatar').src = user.photoURL || "";
+        document.getElementById('uname').textContent = user.displayName || "User";
+        document.getElementById('uemail').textContent = user.email || "";
+      } else {
+        preAuth.style.display = "block";
+        userbox.classList.remove('active');
+      }
+    });
+
+    document.getElementById('logout-btn').addEventListener('click', () => {
+      signOut(auth);
+    });
+  }
+</script>
+</body>
+</html>
