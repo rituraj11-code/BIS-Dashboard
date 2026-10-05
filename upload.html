@@ -41,6 +41,16 @@
   #save-status.ok{color:var(--green);font-weight:600}
   #save-status.err{color:#c9302c;font-weight:600}
   .foot-total{font-weight:800;background:#eef2fb}
+  .paste-box{background:#f6f8fc;border:1px dashed var(--blue);border-radius:10px;padding:14px 16px;margin-bottom:18px}
+  .paste-box h3{margin:0 0 6px;font-size:13.5px;color:var(--navy)}
+  .paste-box textarea{width:100%;min-height:110px;font-family:Consolas,monospace;font-size:12px;
+       padding:10px;border:1px solid var(--line);border-radius:8px;resize:vertical}
+  .paste-box .hint{font-size:11.5px;color:var(--muted);margin:6px 0 10px}
+  #parse-btn{padding:9px 18px;border:none;border-radius:8px;background:var(--blue);color:#fff;font-weight:700;cursor:pointer;font-size:13px}
+  #parse-status{font-size:12px;margin-left:10px}
+  #parse-status.ok{color:var(--green);font-weight:600}
+  #parse-status.err{color:var(--red);font-weight:600}
+  #parse-status.warn{color:#b26a00;font-weight:600}
 </style>
 </head>
 <body>
@@ -96,6 +106,17 @@
   <div class="card">
     <h2>District-wise Data</h2>
     <p class="sub">The Total column is calculated automatically. You can leave a field blank where there is no value (it will be treated as 0).</p>
+
+    <div class="paste-box">
+      <h3>Paste from Excel / CSV (optional — fills the table automatically)</h3>
+      <div class="hint" id="paste-hint"></div>
+      <textarea id="paste-area" placeholder="Paste here — one district per line"></textarea>
+      <div style="margin-top:8px">
+        <button id="parse-btn" type="button">Parse &amp; Fill Table</button>
+        <span id="parse-status"></span>
+      </div>
+    </div>
+
     <div class="tablewrap">
       <table>
         <thead id="table-head"></thead>
@@ -242,8 +263,92 @@
     footer.innerHTML = cells;
   }
 
-  typeSelect.addEventListener('change', buildTable);
+  function updatePasteHint(){
+    const cfg = REPORT_TYPES[typeSelect.value];
+    document.getElementById('paste-hint').textContent =
+      'One district per line. Format: District Name, then ' + cfg.cols.length +
+      ' numbers in this order — ' + cfg.cols.map(c=>cfg.colLabels[c]).join(', ') +
+      '. Skip Sr.No, LGD code and Total columns.';
+  }
+
+  typeSelect.addEventListener('change', () => { buildTable(); updatePasteHint(); });
   buildTable();
+  updatePasteHint();
+
+  // --- District name matching (tolerant of spacing/case/hyphen differences) ---
+  function normalizeName(s){
+    return (s||'').toLowerCase().replace(/[^a-z]/g,'');
+  }
+  const DISTRICT_LOOKUP = {};
+  DISTRICTS.forEach(([name,lgd]) => { DISTRICT_LOOKUP[normalizeName(name)] = lgd; });
+
+  function findDistrictLgd(token){
+    const n = normalizeName(token);
+    if (DISTRICT_LOOKUP[n]) return DISTRICT_LOOKUP[n];
+    // try partial match (e.g. "Charkhi" matching "Charkhi Dadri")
+    const match = Object.keys(DISTRICT_LOOKUP).find(k => k.startsWith(n) || n.startsWith(k));
+    return match ? DISTRICT_LOOKUP[match] : null;
+  }
+
+  // --- Parse pasted Excel/CSV text and fill the table ---
+  document.getElementById('parse-btn').addEventListener('click', () => {
+    const cfg = REPORT_TYPES[typeSelect.value];
+    const statusEl = document.getElementById('parse-status');
+    const raw = document.getElementById('paste-area').value;
+    const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+
+    if (lines.length === 0){
+      statusEl.textContent = 'Paste some data first.';
+      statusEl.className = 'err';
+      return;
+    }
+
+    let filled = 0, skipped = 0;
+    const skippedLines = [];
+
+    lines.forEach(line => {
+      // Split by tab first (Excel copy-paste), fallback to 2+ spaces, fallback to comma
+      let parts = line.split('\t');
+      if (parts.length < 2) parts = line.split(/\s{2,}/);
+      if (parts.length < 2) parts = line.split(',');
+      parts = parts.map(p => p.trim()).filter(p => p.length > 0);
+      if (parts.length < 2) { skipped++; skippedLines.push(line); return; }
+
+      const lgd = findDistrictLgd(parts[0]);
+      if (!lgd) { skipped++; skippedLines.push(line); return; }
+
+      // Extract numeric tokens from the remaining parts (strip commas, ignore non-numeric)
+      const numbers = parts.slice(1)
+        .map(p => p.replace(/,/g, '').replace(/[^\d.-]/g, ''))
+        .filter(p => p.length > 0 && !isNaN(p))
+        .map(p => parseInt(p, 10));
+
+      if (numbers.length === 0) { skipped++; skippedLines.push(line); return; }
+
+      const tr = document.querySelector(`tr[data-lgd="${lgd}"]`);
+      if (!tr) { skipped++; skippedLines.push(line); return; }
+
+      cfg.cols.forEach((c, i) => {
+        const val = numbers[i] !== undefined ? numbers[i] : 0;
+        const input = tr.querySelector('.f-' + c);
+        if (input) input.value = val;
+      });
+      recalcRow(tr.querySelector('.f-' + cfg.cols[0]));
+      filled++;
+    });
+
+    if (filled > 0 && skipped === 0){
+      statusEl.textContent = `Filled ${filled} district${filled>1?'s':''} successfully.`;
+      statusEl.className = 'ok';
+    } else if (filled > 0 && skipped > 0){
+      statusEl.textContent = `Filled ${filled}, skipped ${skipped} line(s) — could not match district name or read numbers.`;
+      statusEl.className = 'warn';
+    } else {
+      statusEl.textContent = `Could not match any lines. Check the format and try again.`;
+      statusEl.className = 'err';
+    }
+    if (skippedLines.length) console.warn('Skipped lines:', skippedLines);
+  });
 
   document.getElementById('report-date').valueAsDate = new Date();
 
