@@ -3,22 +3,24 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>BIS Dashboard — Upload Panel</title>
+<title>BIS Dashboard — Upload Panel (Admin)</title>
 <style>
-  :root{--navy:#0b2559;--navy2:#123a7a;--saffron:#ff8f1f;--blue:#2f5bea;--bg:#f3f5fa;--text:#172033;--muted:#66738a;--line:#e4e8f0;--green:#1a8f4c}
+  :root{--navy:#0b2559;--navy2:#123a7a;--saffron:#ff8f1f;--blue:#2f5bea;--bg:#f3f5fa;--text:#172033;--muted:#66738a;--line:#e4e8f0;--green:#1a8f4c;--red:#c9302c}
   *{box-sizing:border-box}
   body{margin:0;min-height:100vh;font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--text)}
   .tricolor{position:fixed;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,#ff9933 0 33.3%,#ffffff 33.3% 66.6%,#128807 66.6% 100%);z-index:10}
   header{background:linear-gradient(135deg,var(--navy),var(--navy2));color:#fff;padding:18px 24px;margin-top:4px}
   header h1{margin:0;font-size:18px}
   header p{margin:2px 0 0;font-size:12.5px;color:#cfe0ff}
-  .topbar{display:flex;justify-content:space-between;align-items:center}
+  .topbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
   .who{display:flex;align-items:center;gap:10px;font-size:13px}
   .who img{width:30px;height:30px;border-radius:50%}
   #logout-btn{padding:6px 14px;border-radius:7px;border:1px solid #ffffff44;background:#ffffff18;color:#fff;cursor:pointer;font-size:12.5px}
   main{max-width:1200px;margin:0 auto;padding:22px}
-  .gate{max-width:420px;margin:60px auto;text-align:center;background:#fff;padding:30px;border-radius:14px;box-shadow:0 10px 30px #0001}
+  .gate{max-width:440px;margin:60px auto;text-align:center;background:#fff;padding:30px;border-radius:14px;box-shadow:0 10px 30px #0001}
   .gate a{color:var(--blue);font-weight:600;text-decoration:none}
+  .gate.denied{border-top:4px solid var(--red)}
+  .gate.denied h3{color:var(--red);margin-top:0}
   .card{background:#fff;border-radius:14px;padding:20px 22px;box-shadow:0 2px 10px #0000000d;margin-bottom:18px}
   .card h2{margin:0 0 4px;font-size:16px;color:var(--navy)}
   .card p.sub{margin:0 0 16px;font-size:12.5px;color:var(--muted)}
@@ -39,7 +41,6 @@
   #save-status.ok{color:var(--green);font-weight:600}
   #save-status.err{color:#c9302c;font-weight:600}
   .foot-total{font-weight:800;background:#eef2fb}
-  .hint{background:#fff3d6;color:#8a5a00;padding:10px 12px;border-radius:8px;font-size:12px;margin-bottom:14px}
 </style>
 </head>
 <body>
@@ -50,12 +51,18 @@
   <a href="index.html">Go to Login page →</a>
 </div>
 
+<div id="denied" class="gate denied" style="display:none">
+  <h3>Access Denied</h3>
+  <p>You are signed in, but this account does not have permission to upload or edit reports.<br>Only the designated admin account can use this panel.</p>
+  <a href="view-reports.html">Go to Dashboard (view-only) →</a>
+</div>
+
 <div id="app" style="display:none">
 <header>
   <div class="topbar">
     <div>
       <h1>BIS Dashboard — Upload Panel</h1>
-      <p>Enter a district-wise Cards Generated report</p>
+      <p>Admin only — enter a new BIS report</p>
     </div>
     <div class="who">
       <a href="view-reports.html" style="color:#fff;font-size:12.5px;margin-right:6px;opacity:.9">View Dashboard</a>
@@ -73,16 +80,17 @@
     <div class="row">
       <div>
         <label>Report Type</label>
-        <select id="report-type">
-          <option value="cards_generated">Cards Generated (District-wise)</option>
-        </select>
+        <select id="report-type"></select>
+      </div>
+      <div id="period-start-wrap" style="display:none">
+        <label>Period Start Date</label>
+        <input type="date" id="period-start">
       </div>
       <div>
-        <label>Report Date (AWS snapshot)</label>
+        <label id="date-label">Report Date (AWS snapshot)</label>
         <input type="date" id="report-date">
       </div>
     </div>
-    <div class="hint">Only the "Cards Generated" form is available right now — Eligible, Pending and Period forms will be added the same way later.</div>
   </div>
 
   <div class="card">
@@ -90,17 +98,9 @@
     <p class="sub">The Total column is calculated automatically. You can leave a field blank where there is no value (it will be treated as 0).</p>
     <div class="tablewrap">
       <table>
-        <thead>
-          <tr>
-            <th>District</th><th>SECC 2011</th><th>Tagged</th><th>VVS(70+)</th>
-            <th>CHIRAYU</th><th>CHIRAYU Ext.</th><th>CCHF Emp.</th><th>CCHF Pens.</th>
-            <th>ASHA</th><th>Angan. Helper</th><th>Angan. Worker</th><th>Divyang</th><th>Total</th>
-          </tr>
-        </thead>
+        <thead id="table-head"></thead>
         <tbody id="district-body"></tbody>
-        <tfoot>
-          <tr class="foot-total" id="footer-row"></tr>
-        </tfoot>
+        <tfoot><tr class="foot-total" id="footer-row"></tr></tfoot>
       </table>
     </div>
     <div class="actions">
@@ -128,6 +128,12 @@
     measurementId: "G-07KE0XYCTP"
   };
 
+  // =====================================================
+  // Only this email is allowed to upload / edit reports.
+  // Replace with your own Gmail address before deploying.
+  // =====================================================
+  const ADMIN_EMAIL = "YOUR_ADMIN_EMAIL@gmail.com";
+
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
   const db = getFirestore(app);
@@ -139,27 +145,80 @@
     ["Rohtak","73"],["Sirsa","74"],["Sonipat","75"],["Yamunanagar","76"],["Mewat","604"],
     ["Palwal","619"],["Charkhi Dadri","701"],["Hansi","792"]
   ];
-  const COLS = ["secc","tagged","vvs","chirayu","ext","cchfe","cchfp","asha","ah","aw","divyang"];
 
-  const tbody = document.getElementById('district-body');
-  DISTRICTS.forEach(([name,lgd])=>{
-    const tr = document.createElement('tr');
-    tr.dataset.lgd = lgd;
-    tr.dataset.district = name;
-    let cells = `<td class="dist">${name}<br><span style="font-weight:400;color:#99a3b5">LGD ${lgd}</span></td>`;
-    COLS.forEach(c=>{
-      cells += `<td><input type="number" min="0" class="f-${c}" oninput="window.recalcRow(this)"></td>`;
-    });
-    cells += `<td class="total" id="tot-${lgd}">0</td>`;
-    tr.innerHTML = cells;
-    tbody.appendChild(tr);
+  // Report type configs — add a new type here and the form builds itself
+  const REPORT_TYPES = {
+    cards_generated: {
+      label: "Cards Generated (District-wise)",
+      cols: ["secc","tagged","vvs","chirayu","ext","cchfe","cchfp","asha","ah","aw","divyang"],
+      colLabels: {secc:"SECC 2011",tagged:"Tagged",vvs:"VVS(70+)",chirayu:"CHIRAYU",ext:"CHIRAYU Ext.",
+                  cchfe:"CCHF Emp.",cchfp:"CCHF Pens.",asha:"ASHA",ah:"Angan. Helper",aw:"Angan. Worker",divyang:"Divyang"},
+      hasRange: false
+    },
+    eligible: {
+      label: "Eligible Beneficiaries (District-wise)",
+      cols: ["secc","tagged","vvs","chirayu","ext","cchfe","cchfp","asha","ah","aw","divyang"],
+      colLabels: {secc:"SECC 2011",tagged:"Tagged",vvs:"VVS(70+)",chirayu:"CHIRAYU",ext:"CHIRAYU Ext.",
+                  cchfe:"CCHF Emp.",cchfp:"CCHF Pens.",asha:"ASHA",ah:"Angan. Helper",aw:"Angan. Worker",divyang:"Divyang"},
+      hasRange: false
+    },
+    pending: {
+      label: "Pending Cards (District-wise)",
+      cols: ["secc","tagged","vvs","chirayu","ext","cchfe","cchfp","asha","ah","aw","divyang"],
+      colLabels: {secc:"SECC 2011",tagged:"Tagged",vvs:"VVS(70+)",chirayu:"CHIRAYU",ext:"CHIRAYU Ext.",
+                  cchfe:"CCHF Emp.",cchfp:"CCHF Pens.",asha:"ASHA",ah:"Angan. Helper",aw:"Angan. Worker",divyang:"Divyang"},
+      hasRange: false
+    },
+    period: {
+      label: "Period Growth Report",
+      cols: ["a","b","c","d","e","f","g"],
+      colLabels: {a:"SECC 2011",b:"VVS(70+)",c:"CHIRAYU",d:"CHIRAYU Ext.",e:"CCHF Emp.",f:"CCHF Pens.",g:"Divyang"},
+      hasRange: true
+    }
+  };
+
+  const typeSelect = document.getElementById('report-type');
+  Object.entries(REPORT_TYPES).forEach(([key, cfg]) => {
+    const opt = document.createElement('option');
+    opt.value = key;
+    opt.textContent = cfg.label;
+    typeSelect.appendChild(opt);
   });
 
+  const tableHead = document.getElementById('table-head');
+  const tbody = document.getElementById('district-body');
+  const periodStartWrap = document.getElementById('period-start-wrap');
+  const dateLabel = document.getElementById('date-label');
+
+  function buildTable(){
+    const cfg = REPORT_TYPES[typeSelect.value];
+    periodStartWrap.style.display = cfg.hasRange ? 'block' : 'none';
+    dateLabel.textContent = cfg.hasRange ? "Period End Date" : "Report Date (AWS snapshot)";
+
+    tableHead.innerHTML = `<tr><th>District</th>${cfg.cols.map(c=>`<th>${cfg.colLabels[c]}</th>`).join('')}<th>Total</th></tr>`;
+
+    tbody.innerHTML = '';
+    DISTRICTS.forEach(([name,lgd])=>{
+      const tr = document.createElement('tr');
+      tr.dataset.lgd = lgd;
+      tr.dataset.district = name;
+      let cells = `<td class="dist">${name}<br><span style="font-weight:400;color:#99a3b5">LGD ${lgd}</span></td>`;
+      cfg.cols.forEach(c=>{
+        cells += `<td><input type="number" min="0" class="f-${c}" oninput="window.recalcRow(this)"></td>`;
+      });
+      cells += `<td class="total" id="tot-${lgd}">0</td>`;
+      tr.innerHTML = cells;
+      tbody.appendChild(tr);
+    });
+    recalcFooter();
+  }
+
   function recalcRow(el){
+    const cfg = REPORT_TYPES[typeSelect.value];
     const tr = el.closest('tr');
     const lgd = tr.dataset.lgd;
     let sum = 0;
-    COLS.forEach(c=>{
+    cfg.cols.forEach(c=>{
       const v = parseInt(tr.querySelector('.f-'+c).value || '0', 10) || 0;
       sum += v;
     });
@@ -169,10 +228,11 @@
   window.recalcRow = recalcRow;
 
   function recalcFooter(){
+    const cfg = REPORT_TYPES[typeSelect.value];
     const footer = document.getElementById('footer-row');
     let cells = `<td class="dist">Total</td>`;
     let grand = 0;
-    COLS.forEach(c=>{
+    cfg.cols.forEach(c=>{
       let colSum = 0;
       document.querySelectorAll('.f-'+c).forEach(inp=>{ colSum += parseInt(inp.value||'0',10)||0; });
       grand += colSum;
@@ -181,21 +241,29 @@
     cells += `<td>${grand.toLocaleString('en-IN')}</td>`;
     footer.innerHTML = cells;
   }
-  recalcFooter();
 
-  // Default date = today
+  typeSelect.addEventListener('change', buildTable);
+  buildTable();
+
   document.getElementById('report-date').valueAsDate = new Date();
 
-  // --- Auth guard ---
+  // --- Auth guard (login + admin-only) ---
   const gate = document.getElementById('gate');
+  const denied = document.getElementById('denied');
   const appEl = document.getElementById('app');
 
   onAuthStateChanged(auth, (user)=>{
     if (!user){
       gate.style.display = 'block';
+      denied.style.display = 'none';
+      appEl.style.display = 'none';
+    } else if (user.email !== ADMIN_EMAIL){
+      gate.style.display = 'none';
+      denied.style.display = 'block';
       appEl.style.display = 'none';
     } else {
       gate.style.display = 'none';
+      denied.style.display = 'none';
       appEl.style.display = 'block';
       document.getElementById('avatar').src = user.photoURL || "";
       document.getElementById('uname').textContent = user.displayName || user.email;
@@ -207,18 +275,27 @@
   // --- Save to Firestore ---
   document.getElementById('save-btn').addEventListener('click', async ()=>{
     const statusEl = document.getElementById('save-status');
-    const reportType = document.getElementById('report-type').value;
+    const reportType = typeSelect.value;
+    const cfg = REPORT_TYPES[reportType];
     const reportDate = document.getElementById('report-date').value;
+    const periodStart = document.getElementById('period-start').value;
+
     if (!reportDate){
       statusEl.textContent = "Please choose a report date first.";
       statusEl.className = "err";
       return;
     }
+    if (cfg.hasRange && !periodStart){
+      statusEl.textContent = "Please choose a period start date.";
+      statusEl.className = "err";
+      return;
+    }
+
     const districts = [];
     document.querySelectorAll('#district-body tr').forEach(tr=>{
       const row = { district: tr.dataset.district, lgd: tr.dataset.lgd };
       let total = 0;
-      COLS.forEach(c=>{
+      cfg.cols.forEach(c=>{
         const v = parseInt(tr.querySelector('.f-'+c).value || '0', 10) || 0;
         row[c] = v;
         total += v;
@@ -235,13 +312,16 @@
     statusEl.className = "";
 
     try {
-      await setDoc(doc(db, "reports", docId), {
+      const payload = {
         reportType,
         reportDate,
         districts,
         updatedBy: user ? (user.email || user.displayName) : "unknown",
         updatedAt: serverTimestamp()
-      });
+      };
+      if (cfg.hasRange) payload.periodStart = periodStart;
+
+      await setDoc(doc(db, "reports", docId), payload);
       statusEl.textContent = "Saved! (" + reportDate + ")";
       statusEl.className = "ok";
     } catch (err) {

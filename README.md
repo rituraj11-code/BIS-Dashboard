@@ -11,12 +11,13 @@ Sab kuch **free** rahega — GitHub (code store) + Firebase (login/database/stor
 - [x] **Step 1 — Login Panel** — Google Sign-In working page
 - [x] **Step 2 — Firebase Project Setup** — project `bis-dashboard-709e4` live hai
 - [x] **Step 2.5 — GitHub Pages par deploy** — live link: https://rituraj11-code.github.io/BIS-Dashboard/
-- [x] **Step 3 (Phase 1) — Upload Panel** — abhi sirf "Cards Generated" form (`upload.html`)
-- [ ] **Step 3 (Phase 2)** — Eligible / Pending / Period report ke forms isi panel mein jodna
-- [ ] **Step 4 — Dashboard ko Firebase se jodna** — taaki dashboard Firestore se latest data
-      khud utha le, hardcoded numbers ki jagah
-- [ ] **Step 5 — Security Rules** — abhi Firestore "test mode" mein hai (koi bhi likh sakta hai agar
-      link mil jaye) — baad mein isko "sirf logged-in users" tak restrict karenge
+- [x] **Step 3 — Upload Panel, 4 report types** — Cards Generated, Eligible, Pending, Period
+      (`upload.html`) — **admin-only**, ek hi Gmail account use kar sakta hai
+- [x] **Step 4 — Public Live Dashboard (view-reports.html)** — bina login ke khulta hai,
+      koi bhi dekh sakta hai; Firestore se seedha data khींचकर KPI cards + scheme snapshot +
+      district table dikhata hai
+- [x] **Step 5 — Security Rules updated** — read sabke liye open, write sirf admin ke liye
+      (neeche "Step 5" section dekho — ye rules Firebase Console mein daalni hongi)
 
 Har step ek chhota, kaam karne wala piece hoga — pehle poora system ek saath nahi banayenge.
 
@@ -89,14 +90,97 @@ seedha database access kar sakta hai (sirf aapke GitHub repo ya login wajah se n
 Test mode 30 din baad apne aap band ho jata hai. Jab Step 5 (Security Rules) karenge,
 tab isko "sirf jo log-in hain" tak lock kar denge. Abhi testing ke liye theek hai.
 
-Jab ye test ho jaye aur kaam kar raha lage, bata dena — hum **Step 4** (dashboard ko
-is data se jodna) ya **Step 3 Phase 2** (baaki report types ke forms) — jo pehle
-karna chaho, kar sakte hain.
+---
+
+## Step 4 — Live Dashboard (view-reports.html)
+
+File: `view-reports.html`
+
+Kya karta hai:
+- Login zaroori hai (jaise upload panel mein)
+- Upar "Report Date" dropdown — Firestore mein jitni bhi dates ki reports save hain, sab yahan
+  dikhengi; koi bhi select karke dekho
+- **KPI cards** — Total Cards Generated, kitne districts ki report aayi, Top Scheme
+- **Scheme-wise Snapshot** — bar-chart jaisa view, har scheme ka total
+- **District-wise table** — search box ke saath, sab 23 districts, sab columns, Total row bhi
+
+Ye poora data **live** Firestore se aata hai — matlab jab bhi Upload Panel se nayi report save
+karoge, yahan turant (page refresh karne par) naya data dikhega. Koi HTML edit karne ki
+zaroorat nahi.
+
+Teeno pages ab aapas mein linked hain:
+- Login page → "Dashboard Dekho" aur "Upload Panel" dono buttons
+- Upload page → "View Dashboard" link (upar right mein)
+- Dashboard page → "+ Upload New Report" link (upar right mein)
+
+### Test karne ka tarika
+1. Saari files GitHub pe upload karo (niche list dekho)
+2. Live link kholo → login karo
+3. "Dashboard Dekho" dabao
+4. Jo report pehle save ki thi, wo dikhni chahiye — numbers, bars, district table sab
+
+---
+
+## Step 5 — Admin email set karna + Security Rules (ZAROORI, abhi karna hai)
+
+Ab sirf **ek hi Gmail account** upload/edit kar payega, baaki sab sirf **dekh** payenge
+(bina login ke bhi). Isko kaam karne ke liye 2 jagah chhoti si setting karni hai:
+
+### 5a. `upload.html` mein apna admin email daalo
+File mein ye line dhundo (near the top of the `<script>` section):
+```js
+const ADMIN_EMAIL = "YOUR_ADMIN_EMAIL@gmail.com";
+```
+Isko apne asli Gmail address se replace karo — jis email se aap login karte ho, wahi daalna
+(jaise `rituraj11.something@gmail.com`). Yahi ek email upload panel use kar payega.
+
+### 5b. Firestore Security Rules update karo
+1. Firebase Console → **Databases & Storage → Firestore Database → Rules** tab
+2. Jo bhi code wahan hai usko hata ke ye paste karo (apna email yahan bhi daalna, upload.html wala hi):
+```
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /reports/{document} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.auth.token.email == "YOUR_ADMIN_EMAIL@gmail.com";
+    }
+  }
+}
+```
+3. **Publish** dabao
+
+Iske baad:
+- `view-reports.html` **koi bhi, bina login ke** khol sakta hai
+- `upload.html` sirf tabhi kaam karega jab aap us admin email se login karo — koi aur login
+  karega to usko "Access Denied" dikhega (upload nahi kar payega, par dashboard dekh sakta hai)
+
+### Test karne ka tarika
+1. Dono jagah apna email daal ke, saari files GitHub pe upload karo
+2. Incognito window mein `view-reports.html` kholo (bina login ke) — data dikhna chahiye
+3. Apne Gmail se `index.html` → login → "Go to Upload Panel" → kaam karna chahiye
+4. Kisi doosre Gmail se login karke test karo — "Access Denied" dikhna chahiye
+
+---
+
+## 4 Report Types (ab sab ek saath available hain)
+
+Upload Panel mein ab ye 4 options milenge:
+1. **Cards Generated (District-wise)**
+2. **Eligible Beneficiaries (District-wise)**
+3. **Pending Cards (District-wise)**
+4. **Period Growth Report** — isme ek extra "Period Start Date" field bhi hai (jaise 15-Jul se
+   01-Oct tak wali reports)
+
+Dashboard (`view-reports.html`) mein bhi yahi 4 options dropdown mein milenge — jo bhi save
+kiya hoga wahi dikhega.
 
 ---
 
 ## Files is folder mein
 
-- `login.html` / `index.html` — Google Sign-In page (dono same hain, GitHub Pages ke liye)
-- `upload.html` — Report upload panel (Step 3, Phase 1)
+- `login.html` / `index.html` — Google Sign-In page, admin login ke liye (dono same hain)
+- `upload.html` — Report upload panel — **admin-only**, 4 report types
+- `view-reports.html` — **Public** live dashboard — koi bhi bina login dekh sakta hai
 - `README.md` — ye file
